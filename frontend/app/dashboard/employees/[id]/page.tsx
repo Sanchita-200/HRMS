@@ -692,119 +692,213 @@ export default function EmployeeProfileHub({ params }: { params: { id: string } 
             {/* --- TAB PANEL: SALARY MANAGEMENT (ADMIN ONLY) --- */}
             {activeTab === 'salary' && role === 'admin' && (
               <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-                {/* Configuration Panel */}
                 <div className="glass p-6 rounded-2xl border border-slate-900 lg:col-span-2 space-y-6">
                   <div className="flex items-center justify-between pb-3 border-b border-slate-900">
                     <h3 className="font-bold text-sm text-white flex items-center gap-2">
-                      <CreditCard className="h-4 w-4 text-indigo-400" /> Salary Configulator
+                      <CreditCard className="h-4 w-4 text-indigo-400" /> Salary Management
                     </h3>
-                    
-                    <div className="flex items-center bg-slate-900 p-1 rounded-lg border border-slate-800">
-                      {(['monthly', 'hourly', 'annual'] as const).map((t) => (
-                        <button
-                          key={t}
-                          onClick={() => setWageType(t)}
-                          className={`px-3 py-1 text-[10px] font-bold rounded capitalize transition-all ${
-                            wageType === t ? 'bg-indigo-600 text-white shadow' : 'text-slate-500 hover:text-slate-300'
-                          }`}
-                        >
-                          {t}
-                        </button>
-                      ))}
-                    </div>
+                    <button
+                      type="button"
+                      onClick={() => setIsEditingSalary((prev) => !prev)}
+                      className="px-3 py-1.5 rounded-lg text-[10px] font-bold border border-slate-800 bg-slate-900 text-slate-300 hover:text-white"
+                    >
+                      {isEditingSalary ? 'Cancel Edit' : 'Edit Salary'}
+                    </button>
                   </div>
 
-                  {/* Settings Input Grid */}
-                  <form className="space-y-4 text-xs">
-                    <div className="grid grid-cols-2 gap-4">
-                      <div>
-                        <label className="block font-bold text-slate-400 mb-1">Defined Annual CTC (₹)</label>
-                        <input
-                          type="number"
-                          value={annualCTC}
-                          onChange={(e) => setAnnualCTC(Number(e.target.value))}
-                          className="w-full bg-slate-900 border border-slate-800 p-2.5 rounded-xl text-white focus:outline-none"
-                        />
-                      </div>
-                      <div>
-                        <label className="block font-bold text-slate-400 mb-1">Basic Pay (% of CTC)</label>
-                        <input
-                          type="number"
-                          value={basicPct}
-                          onChange={(e) => setBasicPct(Number(e.target.value))}
-                          className="w-full bg-slate-900 border border-slate-800 p-2.5 rounded-xl text-white focus:outline-none"
-                        />
-                      </div>
+                  {salaryToast && (
+                    <div
+                      className={`p-3 rounded-xl border text-[10px] flex items-start gap-2 ${
+                        salaryToast.type === 'success'
+                          ? 'bg-emerald-950/20 border-emerald-900/30 text-emerald-400'
+                          : 'bg-red-950/20 border-red-900/30 text-red-400'
+                      }`}
+                    >
+                      <AlertTriangle className="h-4 w-4 shrink-0 mt-0.5" />
+                      <span>{salaryToast.message}</span>
                     </div>
+                  )}
 
-                    <div className="grid grid-cols-3 gap-4">
-                      <div>
-                        <label className="block font-bold text-slate-400 mb-1">HRA (% of CTC)</label>
-                        <input
-                          type="number"
-                          value={hraPct}
-                          onChange={(e) => setHraPct(Number(e.target.value))}
-                          className="w-full bg-slate-900 border border-slate-800 p-2.5 rounded-xl text-white focus:outline-none"
-                        />
-                      </div>
-                      <div>
-                        <label className="block font-bold text-slate-400 mb-1">Medical (Fixed ₹/yr)</label>
-                        <input
-                          type="number"
-                          value={medicalFixed}
-                          onChange={(e) => setMedicalFixed(Number(e.target.value))}
-                          className="w-full bg-slate-900 border border-slate-800 p-2.5 rounded-xl text-white focus:outline-none"
-                        />
-                      </div>
-                      <div>
-                        <label className="block font-bold text-slate-400 mb-1">Special (Fixed ₹/yr)</label>
-                        <input
-                          type="number"
-                          value={specialFixed}
-                          onChange={(e) => setSpecialFixed(Number(e.target.value))}
-                          className="w-full bg-slate-900 border border-slate-800 p-2.5 rounded-xl text-white focus:outline-none"
-                        />
-                      </div>
+                  {isLoadingSalary ? (
+                    <div className="rounded-2xl border border-slate-900 bg-slate-950/50 p-6 text-xs text-slate-500">
+                      Loading salary configuration...
                     </div>
+                  ) : (
+                    <form onSubmit={handleSaveSalary} className="space-y-4 text-xs">
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                        <div>
+                          <label className="block font-bold text-slate-400 mb-1">Monthly Wage (₹)</label>
+                          <input
+                            type="number"
+                            value={monthlyWage}
+                            onChange={(e) => setMonthlyWage(Number(e.target.value))}
+                            disabled={!isEditingSalary}
+                            className="w-full bg-slate-900 border border-slate-800 p-2.5 rounded-xl text-white focus:outline-none disabled:opacity-60"
+                          />
+                        </div>
+                        <div>
+                          <label className="block font-bold text-slate-400 mb-1">Working Days / Week</label>
+                          <input
+                            type="number"
+                            value={workingDays}
+                            onChange={(e) => setWorkingDays(Number(e.target.value))}
+                            disabled={!isEditingSalary}
+                            className="w-full bg-slate-900 border border-slate-800 p-2.5 rounded-xl text-white focus:outline-none disabled:opacity-60"
+                          />
+                        </div>
+                      </div>
 
-                    {/* Validator Error Alert */}
-                    {!isSalaryValid && (
-                      <div className="p-3 bg-red-950/20 border border-red-900/30 rounded-xl text-[10px] text-red-400 flex items-start gap-2">
-                        <AlertTriangle className="h-4 w-4 shrink-0 mt-0.5" />
-                        <span>{salaryError}</span>
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                        <div>
+                          <label className="block font-bold text-slate-400 mb-1">Working Hours / Day</label>
+                          <input
+                            type="number"
+                            value={workingHours}
+                            onChange={(e) => setWorkingHours(Number(e.target.value))}
+                            disabled={!isEditingSalary}
+                            className="w-full bg-slate-900 border border-slate-800 p-2.5 rounded-xl text-white focus:outline-none disabled:opacity-60"
+                          />
+                        </div>
+                        <div>
+                          <label className="block font-bold text-slate-400 mb-1">Professional Tax (₹)</label>
+                          <input
+                            type="number"
+                            value={profTax}
+                            onChange={(e) => setProfTax(Number(e.target.value))}
+                            disabled={!isEditingSalary}
+                            className="w-full bg-slate-900 border border-slate-800 p-2.5 rounded-xl text-white focus:outline-none disabled:opacity-60"
+                          />
+                        </div>
                       </div>
-                    )}
-                  </form>
 
-                  {/* Calculations Preview Sheet */}
-                  <div className="border-t border-slate-900 pt-6 space-y-3.5 text-xs text-slate-400">
-                    <h4 className="font-bold text-white mb-2">Live Calculations Preview</h4>
-                    <div className="grid grid-cols-2 gap-4">
-                      <div className="space-y-2">
-                        <div className="flex justify-between py-1.5 border-b border-slate-900/60">
-                          <span>Monthly Basic Pay</span>
-                          <span className="font-bold text-white">₹{(calcBasic / 12).toFixed(2)}</span>
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                        <div>
+                          <label className="block font-bold text-slate-400 mb-1">Basic Pay (%)</label>
+                          <input
+                            type="number"
+                            value={basicPct}
+                            onChange={(e) => setBasicPct(Number(e.target.value))}
+                            disabled={!isEditingSalary}
+                            className="w-full bg-slate-900 border border-slate-800 p-2.5 rounded-xl text-white focus:outline-none disabled:opacity-60"
+                          />
                         </div>
-                        <div className="flex justify-between py-1.5 border-b border-slate-900/60">
-                          <span>Monthly HRA</span>
-                          <span className="font-bold text-white">₹{(calcHra / 12).toFixed(2)}</span>
-                        </div>
-                      </div>
-                      <div className="space-y-2">
-                        <div className="flex justify-between py-1.5 border-b border-slate-900/60">
-                          <span>Tax deductions</span>
-                          <span className="font-bold text-red-400">-₹{(calcTax / 12).toFixed(2)}</span>
-                        </div>
-                        <div className="flex justify-between py-1.5 border-b border-slate-900/60">
-                          <span>Monthly Net Take-Home</span>
-                          <span className="font-bold text-emerald-400">₹{(calcNet / 12).toFixed(2)}</span>
+                        <div>
+                          <label className="block font-bold text-slate-400 mb-1">HRA (%)</label>
+                          <input
+                            type="number"
+                            value={hraPct}
+                            onChange={(e) => setHraPct(Number(e.target.value))}
+                            disabled={!isEditingSalary}
+                            className="w-full bg-slate-900 border border-slate-800 p-2.5 rounded-xl text-white focus:outline-none disabled:opacity-60"
+                          />
                         </div>
                       </div>
-                    </div>
-                  </div>
+
+                      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                        <div>
+                          <label className="block font-bold text-slate-400 mb-1">Standard Allowance</label>
+                          <input
+                            type="number"
+                            value={standardVal}
+                            onChange={(e) => setStandardVal(Number(e.target.value))}
+                            disabled={!isEditingSalary}
+                            className="w-full bg-slate-900 border border-slate-800 p-2.5 rounded-xl text-white focus:outline-none disabled:opacity-60"
+                          />
+                        </div>
+                        <div>
+                          <label className="block font-bold text-slate-400 mb-1">Performance Bonus</label>
+                          <input
+                            type="number"
+                            value={performanceVal}
+                            onChange={(e) => setPerformanceVal(Number(e.target.value))}
+                            disabled={!isEditingSalary}
+                            className="w-full bg-slate-900 border border-slate-800 p-2.5 rounded-xl text-white focus:outline-none disabled:opacity-60"
+                          />
+                        </div>
+                        <div>
+                          <label className="block font-bold text-slate-400 mb-1">LTA</label>
+                          <input
+                            type="number"
+                            value={ltaVal}
+                            onChange={(e) => setLtaVal(Number(e.target.value))}
+                            disabled={!isEditingSalary}
+                            className="w-full bg-slate-900 border border-slate-800 p-2.5 rounded-xl text-white focus:outline-none disabled:opacity-60"
+                          />
+                        </div>
+                      </div>
+
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                        <div>
+                          <label className="block font-bold text-slate-400 mb-1">Employee PF (%)</label>
+                          <input
+                            type="number"
+                            value={pfEmployeePct}
+                            onChange={(e) => setPfEmployeePct(Number(e.target.value))}
+                            disabled={!isEditingSalary}
+                            className="w-full bg-slate-900 border border-slate-800 p-2.5 rounded-xl text-white focus:outline-none disabled:opacity-60"
+                          />
+                        </div>
+                        <div>
+                          <label className="block font-bold text-slate-400 mb-1">Employer PF (%)</label>
+                          <input
+                            type="number"
+                            value={pfEmployerPct}
+                            onChange={(e) => setPfEmployerPct(Number(e.target.value))}
+                            disabled={!isEditingSalary}
+                            className="w-full bg-slate-900 border border-slate-800 p-2.5 rounded-xl text-white focus:outline-none disabled:opacity-60"
+                          />
+                        </div>
+                      </div>
+
+                      {!isSalaryValid && (
+                        <div className="p-3 bg-red-950/20 border border-red-900/30 rounded-xl text-[10px] text-red-400 flex items-start gap-2">
+                          <AlertTriangle className="h-4 w-4 shrink-0 mt-0.5" />
+                          <span>{salaryError}</span>
+                        </div>
+                      )}
+
+                      <div className="border-t border-slate-900 pt-4 grid grid-cols-1 sm:grid-cols-2 gap-4 text-xs text-slate-400">
+                        <div className="space-y-2">
+                          <div className="flex justify-between py-1.5 border-b border-slate-900/60">
+                            <span>Basic Pay</span>
+                            <span className="font-bold text-white">₹{calcBasic.toLocaleString(undefined, { maximumFractionDigits: 2 })}</span>
+                          </div>
+                          <div className="flex justify-between py-1.5 border-b border-slate-900/60">
+                            <span>HRA</span>
+                            <span className="font-bold text-white">₹{calcHra.toLocaleString(undefined, { maximumFractionDigits: 2 })}</span>
+                          </div>
+                          <div className="flex justify-between py-1.5 border-b border-slate-900/60">
+                            <span>PF Deduction</span>
+                            <span className="font-bold text-red-400">-₹{calcPF.toLocaleString(undefined, { maximumFractionDigits: 2 })}</span>
+                          </div>
+                        </div>
+                        <div className="space-y-2">
+                          <div className="flex justify-between py-1.5 border-b border-slate-900/60">
+                            <span>Total Components</span>
+                            <span className="font-bold text-white">₹{totalComponents.toLocaleString(undefined, { maximumFractionDigits: 2 })}</span>
+                          </div>
+                          <div className="flex justify-between py-1.5 border-b border-slate-900/60">
+                            <span>Fixed Allowance</span>
+                            <span className="font-bold text-white">₹{fixedAllowance.toLocaleString(undefined, { maximumFractionDigits: 2 })}</span>
+                          </div>
+                          <div className="flex justify-between py-1.5 border-b border-slate-900/60">
+                            <span>Net Salary</span>
+                            <span className="font-bold text-emerald-400">₹{calcNet.toLocaleString(undefined, { maximumFractionDigits: 2 })}</span>
+                          </div>
+                        </div>
+                      </div>
+
+                      <button
+                        type="submit"
+                        disabled={!isEditingSalary || salarySaveLoading || !isSalaryValid}
+                        className="px-5 py-3 rounded-xl bg-gradient-to-r from-indigo-600 to-purple-600 text-white text-xs font-bold hover:brightness-110 shadow-lg shadow-indigo-600/10 transition-all disabled:opacity-60"
+                      >
+                        {salarySaveLoading ? 'Saving...' : 'Save Salary Configuration'}
+                      </button>
+                    </form>
+                  )}
                 </div>
 
-                {/* AI Salary assistant Panel */}
                 <div className="glass p-6 rounded-2xl border border-slate-900 flex flex-col justify-between h-[450px]">
                   <div className="flex flex-col h-[calc(100%-60px)]">
                     <div className="flex items-center gap-2 mb-4">
@@ -816,8 +910,8 @@ export default function EmployeeProfileHub({ params }: { params: { id: string } 
                       {salaryChatLog.map((msg, i) => (
                         <div key={i} className={`flex ${msg.sender === 'user' ? 'justify-end' : 'justify-start'}`}>
                           <div className={`p-2.5 rounded-xl border max-w-[85%] ${
-                            msg.sender === 'user' 
-                              ? 'bg-indigo-600/10 border-indigo-500/20 text-indigo-300' 
+                            msg.sender === 'user'
+                              ? 'bg-indigo-600/10 border-indigo-500/20 text-indigo-300'
                               : 'bg-slate-900 border-slate-800 text-slate-300'
                           }`}>
                             {msg.text}
@@ -827,7 +921,6 @@ export default function EmployeeProfileHub({ params }: { params: { id: string } 
                     </div>
                   </div>
 
-                  {/* input */}
                   <div className="flex items-center gap-2 bg-slate-900 border border-slate-800 p-1.5 rounded-xl">
                     <input
                       type="text"
@@ -838,6 +931,7 @@ export default function EmployeeProfileHub({ params }: { params: { id: string } 
                       className="flex-1 bg-transparent border-none text-[10px] text-white placeholder-slate-500 focus:ring-0 focus:outline-none px-2"
                     />
                     <button
+                      type="button"
                       onClick={handleSalaryChatSend}
                       className="bg-indigo-600 text-white p-2 rounded-lg"
                     >

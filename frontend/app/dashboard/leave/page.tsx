@@ -1,16 +1,36 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useUI } from '../../../lib/context';
 import { mockLeaveRequests, MockLeave } from '../../../lib/api';
-import { FileText, CheckCircle2, XCircle, Clock, Sparkles, X, Plus } from 'lucide-react';
+import { FileText, CheckCircle2, XCircle, Clock, Sparkles, X, Plus, Upload, Paperclip, AlertTriangle } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
+
+interface MedicalCertificateRecord {
+  id: string;
+  employee_id: string;
+  employee_name: string;
+  employee_email: string;
+  document_type: string;
+  file_name: string;
+  storage_path: string;
+  upload_date: string;
+  notes?: string | null;
+}
+
+const API_ROOT = 'http://localhost:8000/api/v1';
 
 export default function LeavePage() {
   const { role, user } = useUI();
   const [requests, setRequests] = useState<MockLeave[]>(mockLeaveRequests);
   const [showApplyModal, setShowApplyModal] = useState(false);
-  
+  const [medicalCertificateFile, setMedicalCertificateFile] = useState<File | null>(null);
+  const [medicalCertificateNotes, setMedicalCertificateNotes] = useState('');
+  const [medicalCertificates, setMedicalCertificates] = useState<MedicalCertificateRecord[]>([]);
+  const [medicalCertificateLoading, setMedicalCertificateLoading] = useState(false);
+  const [medicalCertificateSubmitting, setMedicalCertificateSubmitting] = useState(false);
+  const [medicalCertificateError, setMedicalCertificateError] = useState('');
+
   // Apply Leave Form States
   const [leaveType, setLeaveType] = useState('Paid Leave');
   const [startDate, setStartDate] = useState('');
@@ -51,6 +71,88 @@ export default function LeavePage() {
     );
   };
 
+  useEffect(() => {
+    const identifier = user?.identifier || user?.email;
+    if (!identifier) {
+      setMedicalCertificates([]);
+      return;
+    }
+
+    let cancelled = false;
+    setMedicalCertificateLoading(true);
+
+    fetch(`${API_ROOT}/documents/medical-certificates?employee_identifier=${encodeURIComponent(identifier)}`)
+      .then(async (response) => {
+        if (!response.ok) {
+          throw new Error('Unable to load medical certificates');
+        }
+        return response.json() as Promise<MedicalCertificateRecord[]>;
+      })
+      .then((data) => {
+        if (!cancelled) {
+          setMedicalCertificates(data);
+        }
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setMedicalCertificates([]);
+        }
+      })
+      .finally(() => {
+        if (!cancelled) {
+          setMedicalCertificateLoading(false);
+        }
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [user?.email, user?.identifier]);
+
+  const handleMedicalCertificateSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setMedicalCertificateError('');
+
+    if (!medicalCertificateFile) {
+      setMedicalCertificateError('Choose a medical certificate file before submitting.');
+      return;
+    }
+
+    const identifier = user?.identifier || user?.email;
+    if (!identifier) {
+      setMedicalCertificateError('No employee profile is available for this session.');
+      return;
+    }
+
+    const formData = new FormData();
+    formData.append('employee_identifier', identifier);
+    formData.append('file', medicalCertificateFile);
+    formData.append('notes', medicalCertificateNotes);
+
+    setMedicalCertificateSubmitting(true);
+
+    try {
+      const response = await fetch(`${API_ROOT}/documents/medical-certificates`, {
+        method: 'POST',
+        body: formData,
+      });
+
+      const payload = await response.json();
+
+      if (!response.ok) {
+        throw new Error(payload?.detail || 'Failed to submit medical certificate');
+      }
+
+      setMedicalCertificates((prev) => [payload, ...prev]);
+      setMedicalCertificateFile(null);
+      setMedicalCertificateNotes('');
+    } catch (error) {
+      setMedicalCertificateError(error instanceof Error ? error.message : 'Failed to submit medical certificate');
+    } finally {
+      setMedicalCertificateSubmitting(false);
+    }
+  };
+
   return (
     <div className="space-y-6">
       {/* Title */}
@@ -83,6 +185,84 @@ export default function LeavePage() {
             <span className="text-[9px] opacity-60 mt-1 block">Remaining days</span>
           </div>
         ))}
+      </div>
+
+      {/* Medical Certificate Submission */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <div className="glass p-6 rounded-3xl border border-slate-900">
+          <h3 className="font-bold text-sm text-white mb-4 flex items-center gap-2">
+            <Upload className="h-4 w-4 text-indigo-400" /> Submit Medical Certificate
+          </h3>
+          {medicalCertificateError && (
+            <div className="mb-4 p-3 rounded-xl border border-red-900/40 bg-red-950/20 text-[11px] text-red-300 flex items-start gap-2">
+              <AlertTriangle className="h-4 w-4 shrink-0 mt-0.5" />
+              <span>{medicalCertificateError}</span>
+            </div>
+          )}
+          <form onSubmit={handleMedicalCertificateSubmit} className="space-y-4 text-xs">
+            <div className="space-y-1.5">
+              <label className="block font-bold text-slate-400">Certificate File</label>
+              <label className="flex items-center gap-2 bg-slate-900 border border-slate-800 p-3 rounded-xl cursor-pointer hover:border-indigo-500/40 transition-colors">
+                <Paperclip className="h-4 w-4 text-slate-500" />
+                <span className="flex-1 text-slate-300 truncate">
+                  {medicalCertificateFile ? medicalCertificateFile.name : 'Choose a PDF, JPG, or PNG file'}
+                </span>
+                <input
+                  type="file"
+                  accept=".pdf,.jpg,.jpeg,.png,image/*,application/pdf"
+                  className="hidden"
+                  onChange={(e) => setMedicalCertificateFile(e.target.files?.[0] ?? null)}
+                />
+              </label>
+            </div>
+
+            <div className="space-y-1.5">
+              <label className="block font-bold text-slate-400">Notes</label>
+              <textarea
+                value={medicalCertificateNotes}
+                onChange={(e) => setMedicalCertificateNotes(e.target.value)}
+                placeholder="Add a short note about the medical leave or supporting details."
+                rows={3}
+                className="w-full bg-slate-900 border border-slate-800 p-3 rounded-xl text-white focus:outline-none placeholder-slate-500"
+              />
+            </div>
+
+            <button
+              type="submit"
+              disabled={medicalCertificateSubmitting}
+              className="w-full py-3 bg-gradient-to-r from-indigo-600 to-purple-600 text-white rounded-xl font-bold hover:brightness-110 shadow-lg shadow-indigo-600/10 transition-all disabled:opacity-60"
+            >
+              {medicalCertificateSubmitting ? 'Submitting...' : 'Submit Certificate'}
+            </button>
+          </form>
+        </div>
+
+        <div className="glass p-6 rounded-3xl border border-slate-900 overflow-x-auto">
+          <h3 className="font-bold text-sm text-white mb-4">Submitted Certificates</h3>
+          <div className="space-y-3 text-xs">
+            {medicalCertificateLoading ? (
+              <p className="text-slate-500">Loading submitted certificates...</p>
+            ) : medicalCertificates.length === 0 ? (
+              <p className="text-slate-500">No medical certificates submitted yet.</p>
+            ) : (
+              medicalCertificates.map((certificate) => (
+                <div key={certificate.id} className="rounded-2xl border border-slate-900 bg-slate-950/50 p-4">
+                  <div className="flex items-center justify-between gap-3">
+                    <div>
+                      <p className="font-bold text-slate-200">{certificate.employee}</p>
+                      <p className="text-slate-500">{certificate.fileName}</p>
+                    </div>
+                    <span className="px-2 py-0.5 rounded-full text-[9px] font-bold uppercase bg-indigo-950/20 text-indigo-400 border border-indigo-900/30">
+                      submitted
+                    </span>
+                  </div>
+                  {certificate.notes && <p className="mt-2 text-slate-400">{certificate.notes}</p>}
+                  <p className="mt-2 text-[10px] text-slate-500">Stored at {certificate.storage_path}</p>
+                </div>
+              ))
+            )}
+          </div>
+        </div>
       </div>
 
       {/* Leave Requests queues */}

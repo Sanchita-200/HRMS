@@ -28,3 +28,18 @@ class DocumentResponse(DocumentBase, AuditSchema):
     employee_id: uuid.UUID
     upload_date: datetime
     embedding_id: Optional[uuid.UUID] = None
+
+
+class MedicalCertificateResponse(BaseModel):
+    id: uuid.UUID
+    employee_id: uuid.UUID
+    employee_name: str
+    employee_email: str
+    document_type: str
+    file_name: str
+    storage_path: str
+    upload_date: datetime
+    notes: Optional[str] = None
+
+    class Config:
+        from_attributes = True

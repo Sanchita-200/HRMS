@@ -1,0 +1,114 @@
+version: '3.8'
+
+services:
+  # --- PostgreSQL Database Service ---
+  database:
+    image: postgres:16-alpine
+    container_name: hrms_database
+    restart: always
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-hrms_admin}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-hrms_secure_password_2026}
+      POSTGRES_DB: ${POSTGRES_DB:-hrms_prod}
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./docker/pg_init:/docker-entrypoint-initdb.d
+    networks:
+      - hrms_network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-hrms_admin} -d ${POSTGRES_DB:-hrms_prod}"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  # --- Local LLM Service (Ollama) ---
+  ollama:
+    image: ollama/ollama:latest
+    container_name: hrms_ollama
+    restart: always
+    ports:
+      - "11434:11434"
+    volumes:
+      - ollama_data:/root/.ollama
+    networks:
+      - hrms_network
+
+  # --- Vector Database Service (ChromaDB) ---
+  chromadb:
+    image: chromadb/chroma:latest
+    container_name: hrms_chromadb
+    restart: always
+    ports:
+      - "8001:8000"
+    environment:
+      - IS_PERSISTENT=TRUE
+      - PERSIST_DIRECTORY=/chromadb/data
+    volumes:
+      - chromadb_data:/chromadb/data
+    networks:
+      - hrms_network
+
+  # --- Python Backend Service (FastAPI) ---
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: hrms_backend
+    restart: always
+    depends_on:
+      database:
+        condition: service_healthy
+      chromadb:
+        condition: service_started
+      ollama:
+        condition: service_started
+    ports:
+      - "8000:8000"
+    environment:
+      - DATABASE_URL=${DATABASE_URL:-postgresql://hrms_admin:hrms_secure_password_2026@database:5432/hrms_prod}
+      - JWT_SECRET_KEY=${JWT_SECRET_KEY:-e6f81a7d6a5d7c3b9b4f5e0a6d2c4e8f0a2d3c5b8e9f1a2b3c4d5e6f7a8b9c0d}
+      - JWT_ALGORITHM=${JWT_ALGORITHM:-HS256}
+      - ACCESS_TOKEN_EXPIRE_MINUTES=${ACCESS_TOKEN_EXPIRE_MINUTES:-60}
+      - OLLAMA_BASE_URL=${OLLAMA_BASE_URL:-http://ollama:11434}
+      - LLM_MODEL=${LLM_MODEL:-llama3.1:8b}
+      - EMBEDDING_MODEL=${EMBEDDING_MODEL:-all-MiniLM-L6-v2}
+      - CHROMA_HOST=${CHROMA_HOST:-chromadb}
+      - CHROMA_PORT=${CHROMA_PORT:-8000}
+    volumes:
+      - ./backend:/app
+    networks:
+      - hrms_network
+
+  # --- Frontend Application (Next.js) ---
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: hrms_frontend
+    restart: always
+    depends_on:
+      - backend
+    ports:
+      - "3000:3000"
+    environment:
+      - NEXT_PUBLIC_API_URL=${NEXT_PUBLIC_API_URL:-http://localhost:8000}
+    volumes:
+      - ./frontend:/app
+      - /app/node_modules
+      - /app/.next
+    networks:
+      - hrms_network
+
+networks:
+  hrms_network:
+    driver: bridge
+
+volumes:
+  postgres_data:
+    driver: local
+  ollama_data:
+    driver: local
+  chromadb_data:
+    driver: local

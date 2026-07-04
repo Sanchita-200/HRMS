@@ -1,0 +1,39 @@
+[tool.pytest.ini_options]
+minversion = "8.0"
+addopts = "-ra -q --tb=short"
+testpaths = [
+    "tests",
+]
+asyncio_mode = "auto"
+python_files = ["test_*.py"]
+
+[tool.ruff]
+# Target Python version 3.12
+target-version = "py312"
+line-length = 88
+indent-width = 4
+
+[tool.ruff.lint]
+# Enable Pyflakes (F) and Import Sorting (I)
+select = ["E", "F", "I", "W"]
+ignore = []
+
+# Allow fix behavior
+fixable = ["ALL"]
+unfixable = []
+
+# Exclude standard directories
+exclude = [
+    ".git",
+    ".venv",
+    "__pycache__",
+    "build",
+    "dist",
+    "migrations",
+]
+
+[tool.ruff.format]
+quote-style = "double"
+indent-style = "space"
+skip-magic-trailing-comma = false
+line-ending = "auto"

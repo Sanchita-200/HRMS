@@ -7,7 +7,7 @@ import { FileText, CheckCircle2, XCircle, Clock, Sparkles, X, Plus } from 'lucid
 import { motion, AnimatePresence } from 'framer-motion';
 
 export default function LeavePage() {
-  const { role } = useUI();
+  const { role, user } = useUI();
   const [requests, setRequests] = useState<MockLeave[]>(mockLeaveRequests);
   const [showApplyModal, setShowApplyModal] = useState(false);
   
@@ -23,7 +23,7 @@ export default function LeavePage() {
     
     const newRequest: MockLeave = {
       id: Math.random().toString(36).substr(2, 9),
-      employee_name: 'Alex Dev',
+      employee_name: user?.name ?? 'Current User',
       leave_type: leaveType,
       reason,
       start_date: startDate,

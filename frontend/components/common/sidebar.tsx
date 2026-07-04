@@ -1,6 +1,7 @@
 'use client';
 
 import React from 'react';
+import { useRouter } from 'next/navigation';
 import { useUI } from '../../lib/context';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
@@ -20,7 +21,8 @@ import {
 import { motion } from 'framer-motion';
 
 export const Sidebar: React.FC = () => {
-  const { role, sidebarOpen, setSidebarOpen } = useUI();
+  const router = useRouter();
+  const { role, sidebarOpen, setSidebarOpen, logout } = useUI();
   const pathname = usePathname();
 
   // Navigation schema configured dynamically based on role type
@@ -97,13 +99,16 @@ export const Sidebar: React.FC = () => {
 
       {/* Footer / Account Settings shortcut */}
       <div className="p-4 border-t border-slate-900">
-        <Link
-          href="/"
+        <button
+          onClick={() => {
+            logout();
+            router.push('/');
+          }}
           className="flex items-center gap-4 px-3.5 py-3 rounded-xl text-slate-400 hover:bg-red-950/20 hover:text-red-400 transition-colors text-xs font-semibold"
         >
           <LogOut className="h-5 w-5" />
           {sidebarOpen && <span>Logout</span>}
-        </Link>
+        </button>
       </div>
     </motion.aside>
   );

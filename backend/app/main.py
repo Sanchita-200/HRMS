@@ -39,13 +39,115 @@ async def lifespan(app: FastAPI):
     logger.info("Initializing AI-HRMS Backend System...")
     logger.info(f"Environment: {settings.ENVIRONMENT} | Debug Mode: {settings.DEBUG}")
 
-    # 2. Validate database connectivity
+    # 2. Bootstrap database tables
+    from app.database.session import engine
+    from app.models import Base
+    try:
+        Base.metadata.create_all(bind=engine)
+        logger.info("Database metadata schema loaded successfully.")
+    except Exception as e:
+        logger.critical(f"DATABASE SCHEMA CREATION FAIL: {str(e)}")
+
+    # 3. Seed mock datasets if tables are empty
     db = SessionLocal()
     try:
         db.execute(text("SELECT 1"))
         logger.info("Database connection handshake verified successfully.")
+        
+        from app.models.organization import Department, Designation, Employee
+        from app.models.payroll import EmployeeSalaryConfiguration
+        import uuid
+        from datetime import date
+        
+        if db.query(Department).count() == 0:
+            logger.info("Seeding initial department records...")
+            eng_dept = Department(id=uuid.uuid4(), name="Engineering", code="ENG", description="Product development and engineering")
+            hr_dept = Department(id=uuid.uuid4(), name="Human Resources", code="HR", description="People operations and recruitment")
+            db.add_all([eng_dept, hr_dept])
+            db.commit()
+            
+            logger.info("Seeding initial designation records...")
+            eng_desg = Designation(id=uuid.uuid4(), job_title="Staff Frontend Engineer", level="L4", salary_grade="SG4")
+            hr_desg = Designation(id=uuid.uuid4(), job_title="HR Specialist", level="L2", salary_grade="SG2")
+            db.add_all([eng_desg, hr_desg])
+            db.commit()
+            
+            logger.info("Seeding initial employee records...")
+            emp1 = Employee(
+                id=uuid.uuid4(),
+                employee_number="EMP/2026/001",
+                full_name="Sarah Jenkins",
+                email="s.jenkins@hrms.com",
+                phone="+91 98765 43210",
+                address="Flat 402, Sea Breeze Apts, Bandra West, Mumbai, Maharashtra",
+                joining_date=date(2022, 4, 12),
+                department_id=eng_dept.id,
+                designation_id=eng_desg.id,
+                gender="Female",
+                dob=date(1996, 8, 24),
+                emergency_contact="+91 98765 43210 (Spouse)",
+                employment_status="active"
+            )
+            emp2 = Employee(
+                id=uuid.uuid4(),
+                employee_number="EMP/2026/002",
+                full_name="David Kross",
+                email="d.kross@hrms.com",
+                phone="+91 98123 45678",
+                address="123 Pine St, San Francisco, CA",
+                joining_date=date(2023, 1, 15),
+                department_id=eng_dept.id,
+                designation_id=eng_desg.id,
+                gender="Male",
+                dob=date(1994, 5, 20),
+                emergency_contact="+91 98123 45678 (Brother)",
+                employment_status="active"
+            )
+            db.add_all([emp1, emp2])
+            db.commit()
+            
+            logger.info("Seeding initial salary configurations...")
+            cfg1 = EmployeeSalaryConfiguration(
+                id=uuid.uuid4(),
+                employee_id=emp1.id,
+                monthly_wage=100000.00,
+                working_days_per_week=5,
+                working_hours_per_day=8,
+                basic_pct=50.00,
+                hra_pct=50.00,
+                standard_allowance_type="fixed",
+                standard_allowance_val=10000.00,
+                performance_bonus_type="fixed",
+                performance_bonus_val=5000.00,
+                lta_type="fixed",
+                lta_val=5000.00,
+                pf_employee_pct=12.00,
+                pf_employer_pct=12.00,
+                professional_tax=200.00
+            )
+            cfg2 = EmployeeSalaryConfiguration(
+                id=uuid.uuid4(),
+                employee_id=emp2.id,
+                monthly_wage=80000.00,
+                working_days_per_week=5,
+                working_hours_per_day=8,
+                basic_pct=50.00,
+                hra_pct=50.00,
+                standard_allowance_type="fixed",
+                standard_allowance_val=8000.00,
+                performance_bonus_type="fixed",
+                performance_bonus_val=4000.00,
+                lta_type="fixed",
+                lta_val=3000.00,
+                pf_employee_pct=12.00,
+                pf_employer_pct=12.00,
+                professional_tax=200.00
+            )
+            db.add_all([cfg1, cfg2])
+            db.commit()
+            logger.info("Database mock seed completed successfully.")
     except Exception as e:
-        logger.critical(f"DATABASE CONNECTION FAIL ON STARTUP: {str(e)}")
+        logger.critical(f"DATABASE CONFIGURATION/SEED ERROR: {str(e)}")
     finally:
         db.close()
 
@@ -91,6 +193,9 @@ app.add_middleware(
 
 # --- Mount Versioned Routers ---
 app.include_router(api_router, prefix=settings.API_V1_STR)
+
+from app.api.v1.endpoints import payroll
+app.include_router(payroll.router, prefix="/api/payroll", tags=["Payroll"])
 
 
 # --- Root Level Diagnostics Endpoints ---

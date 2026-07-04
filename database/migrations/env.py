@@ -21,10 +21,8 @@ if config.config_file_name is not None:
 from app.models import Base
 target_metadata = Base.metadata
 
-# Determine database URL from environment variable, falling back to alembic.ini setting
-db_url = os.getenv("DATABASE_URL")
-if db_url:
-    config.set_main_option("sqlalchemy.url", db_url)
+from app.core.config import settings
+config.set_main_option("sqlalchemy.url", settings.DATABASE_URL)
 
 
 def run_migrations_offline() -> None:

@@ -23,7 +23,7 @@ import {
 import { motion } from 'framer-motion';
 
 export default function OverviewDashboard() {
-  const { role, isCheckedIn, setCheckedIn, checkInTime, setCheckInTime, setCopilotOpen } = useUI();
+  const { role, user, isCheckedIn, setCheckedIn, checkInTime, setCheckInTime, setCopilotOpen } = useUI();
 
   const handleClockToggle = () => {
     if (!isCheckedIn) {
@@ -38,6 +38,8 @@ export default function OverviewDashboard() {
 
   // --- RENDERING EMPLOYEE DASHBOARD ---
   if (role === 'employee') {
+    const displayName = user?.name ?? 'Employee';
+
     return (
       <div className="space-y-6 animate-fade-in-up">
         {/* Good Morning / Hero Welcome banner */}
@@ -47,7 +49,7 @@ export default function OverviewDashboard() {
           </div>
           <div className="max-w-2xl">
             <span className="text-xs font-bold text-indigo-400 uppercase tracking-widest block mb-2">My Portal Overview</span>
-            <h1 className="text-3xl md:text-4xl font-extrabold text-white mb-2">Good morning, Alex</h1>
+            <h1 className="text-3xl md:text-4xl font-extrabold text-white mb-2">Good morning, {displayName}</h1>
             <p className="text-xs text-slate-400 mb-6">Today is {new Date().toLocaleDateString(undefined, { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}</p>
             
             {/* AI Summary Notification */}

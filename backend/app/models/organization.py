@@ -85,3 +85,9 @@ class Employee(Base, AuditMixin):
     payrolls: Mapped[List["Payroll"]] = relationship("Payroll", back_populates="employee", cascade="all, delete-orphan")
     documents: Mapped[List["Document"]] = relationship("Document", back_populates="employee", cascade="all, delete-orphan")
     activity_logs: Mapped[List["ActivityLog"]] = relationship("ActivityLog", back_populates="employee", cascade="all, delete-orphan")
+    salary_configuration: Mapped[Optional["EmployeeSalaryConfiguration"]] = relationship(
+        "EmployeeSalaryConfiguration", 
+        back_populates="employee", 
+        uselist=False, 
+        cascade="all, delete-orphan"
+    )

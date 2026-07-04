@@ -4,6 +4,12 @@ import React, { createContext, useContext, useState, useEffect } from 'react';
 
 export type UserRole = 'admin' | 'employee';
 
+export interface AuthUser {
+  name: string;
+  email: string;
+  identifier: string;
+}
+
 export interface ChatMessage {
   id: string;
   sender: 'user' | 'assistant';
@@ -14,6 +20,11 @@ export interface ChatMessage {
 interface UIContextType {
   role: UserRole;
   setRole: (role: UserRole) => void;
+  isAuthenticated: boolean;
+  authReady: boolean;
+  user: AuthUser | null;
+  login: (user: AuthUser, role: UserRole) => void;
+  logout: () => void;
   sidebarOpen: boolean;
   setSidebarOpen: (open: boolean) => void;
   copilotOpen: boolean;
@@ -29,9 +40,12 @@ interface UIContextType {
 const UIContext = createContext<UIContextType | undefined>(undefined);
 
 export const UIProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const [role, setRole] = useState<UserRole>('admin');
+  const [role, setRoleState] = useState<UserRole>('admin');
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [copilotOpen, setCopilotOpen] = useState(false);
+  const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const [authReady, setAuthReady] = useState(false);
+  const [user, setUser] = useState<AuthUser | null>(null);
   const [isCheckedIn, setCheckedIn] = useState(false);
   const [checkInTime, setCheckInTime] = useState<string | null>(null);
   const [chatMessages, setChatMessages] = useState<ChatMessage[]>([
@@ -56,6 +70,46 @@ export const UIProvider: React.FC<{ children: React.ReactNode }> = ({ children }
     window.addEventListener('resize', handleResize);
     return () => window.removeEventListener('resize', handleResize);
   }, []);
+
+  useEffect(() => {
+    const storedRole = window.localStorage.getItem('hrms-role');
+    const storedAuth = window.localStorage.getItem('hrms-authenticated');
+    const storedUser = window.localStorage.getItem('hrms-user');
+
+    if (storedRole === 'employee' || storedRole === 'admin') {
+      setRoleState(storedRole);
+    }
+    setIsAuthenticated(storedAuth === 'true');
+    if (storedUser) {
+      try {
+        setUser(JSON.parse(storedUser) as AuthUser);
+      } catch {
+        setUser(null);
+      }
+    }
+    setAuthReady(true);
+  }, []);
+
+  const setRole = (nextRole: UserRole) => {
+    window.localStorage.setItem('hrms-role', nextRole);
+    setRoleState(nextRole);
+  };
+
+  const login = (nextUser: AuthUser, nextRole: UserRole) => {
+    window.localStorage.setItem('hrms-authenticated', 'true');
+    window.localStorage.setItem('hrms-user', JSON.stringify(nextUser));
+    window.localStorage.setItem('hrms-role', nextRole);
+    setUser(nextUser);
+    setRoleState(nextRole);
+    setIsAuthenticated(true);
+  };
+
+  const logout = () => {
+    window.localStorage.removeItem('hrms-authenticated');
+    window.localStorage.removeItem('hrms-user');
+    setIsAuthenticated(false);
+    setUser(null);
+  };
 
   const sendChatMessage = (text: string) => {
     const newMsg: ChatMessage = {
@@ -99,6 +153,11 @@ export const UIProvider: React.FC<{ children: React.ReactNode }> = ({ children }
       value={{
         role,
         setRole,
+        isAuthenticated,
+        authReady,
+        user,
+        login,
+        logout,
         sidebarOpen,
         setSidebarOpen,
         copilotOpen,

@@ -3,16 +3,20 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { motion, AnimatePresence } from 'framer-motion';
+import { useUI } from '../lib/context';
 import { 
   Shield, Users, Clock, FileText, CreditCard, 
   Bot, BarChart3, Layers, Terminal, Sparkles, 
-  Mail, Lock, Eye, EyeOff, Building, User, Phone, CheckSquare, 
+  Mail, Lock, Eye, EyeOff, User, Hash, CheckSquare, 
   ArrowRight, Chrome, Github, AlertTriangle
 } from 'lucide-react';
+import type { UserRole } from '../lib/context';
 
 export default function AuthPage() {
   const router = useRouter();
+  const { login, isAuthenticated, authReady } = useUI();
   const [formMode, setFormMode] = useState<'signin' | 'signup'>('signin');
+  const [selectedRole, setSelectedRole] = useState<UserRole>('employee');
   const [showPassword, setShowPassword] = useState(false);
   const [rememberMe, setRememberMe] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
@@ -31,15 +35,20 @@ export default function AuthPage() {
     return () => window.removeEventListener('mousemove', handleMouseMove);
   }, []);
 
+  useEffect(() => {
+    if (authReady && isAuthenticated) {
+      router.replace('/dashboard');
+    }
+  }, [authReady, isAuthenticated, router]);
+
   // --- SIGN IN STATE ---
-  const [loginEmail, setLoginEmail] = useState('');
+  const [loginIdentifier, setLoginIdentifier] = useState('');
   const [loginPassword, setLoginPassword] = useState('');
 
   // --- SIGN UP STATE ---
-  const [companyName, setCompanyName] = useState('');
   const [fullName, setFullName] = useState('');
+  const [employeeId, setEmployeeId] = useState('');
   const [signupEmail, setSignupEmail] = useState('');
-  const [phone, setPhone] = useState('');
   const [signupPassword, setSignupPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [termsAccepted, setTermsAccepted] = useState(false);
@@ -48,6 +57,28 @@ export default function AuthPage() {
   const [passwordStrength, setPasswordStrength] = useState(0);
   const [strengthLabel, setStrengthLabel] = useState('Weak');
   const [strengthColor, setStrengthColor] = useState('bg-red-500');
+
+  const buildDisplayName = (value: string) => {
+    const trimmedValue = value.trim();
+    if (!trimmedValue) {
+      return 'Employee';
+    }
+
+    if (trimmedValue.includes('@')) {
+      return trimmedValue
+        .split('@')[0]
+        .split(/[._-]+/)
+        .filter(Boolean)
+        .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+        .join(' ');
+    }
+
+    return trimmedValue
+      .split(/[\s._-]+/)
+      .filter(Boolean)
+      .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+      .join(' ');
+  };
 
   useEffect(() => {
     const pwd = formMode === 'signup' ? signupPassword : loginPassword;
@@ -85,12 +116,8 @@ export default function AuthPage() {
 
     if (formMode === 'signin') {
       // Validate inputs
-      if (!loginEmail.trim() || !loginPassword.trim()) {
-        setFormError('Please enter both email and password.');
-        return;
-      }
-      if (!/\S+@\S+\.\S+/.test(loginEmail)) {
-        setFormError('Please enter a valid email address.');
+      if (!loginIdentifier.trim() || !loginPassword.trim()) {
+        setFormError('Please enter your employee ID or email and password.');
         return;
       }
 
@@ -101,14 +128,19 @@ export default function AuthPage() {
         setIsLoading(false);
         setFormSuccess('Access Granted. Redirecting to your workspace...');
         setTimeout(() => {
+          login({
+            name: buildDisplayName(loginIdentifier),
+            email: loginIdentifier.includes('@') ? loginIdentifier.trim() : `${loginIdentifier.trim()}@hrms.local`,
+            identifier: loginIdentifier.trim()
+          }, selectedRole);
           router.push('/dashboard');
         }, 1200);
       }, 1500);
 
     } else {
       // Sign Up validation
-      if (!companyName.trim() || !fullName.trim() || !signupEmail.trim() || !signupPassword.trim()) {
-        setFormError('All fields are required.');
+      if (!fullName.trim() || !employeeId.trim() || !signupEmail.trim() || !signupPassword.trim()) {
+        setFormError('Please enter your name, employee ID, email, and password.');
         return;
       }
       if (!/\S+@\S+\.\S+/.test(signupEmail)) {
@@ -133,12 +165,18 @@ export default function AuthPage() {
       // Simulate Sign Up API Call
       setTimeout(() => {
         setIsLoading(false);
-        setFormSuccess('Account initialized! Swapping to Sign In...');
+        setFormSuccess('Account created! Please sign in with your employee ID or email.');
         setTimeout(() => {
           setFormMode('signin');
           setFormSuccess('');
-          setLoginEmail(signupEmail);
+          setLoginIdentifier(employeeId || signupEmail);
           setLoginPassword(signupPassword);
+          login({
+            name: buildDisplayName(fullName),
+            email: signupEmail.trim(),
+            identifier: employeeId.trim() || signupEmail.trim()
+          }, selectedRole);
+          router.push('/dashboard');
         }, 1500);
       }, 1800);
     }
@@ -256,12 +294,43 @@ export default function AuthPage() {
                 {formMode === 'signin' ? 'Intelligent HR. Powered by AI.' : 'Initialize Enterprise Account'}
               </h2>
               <p className="text-xs text-slate-400">
-                {formMode === 'signin' ? 'Sign in to access your administrative workspace.' : 'Register company tenant and deploy local nodes.'}
+                {formMode === 'signin' ? 'Sign in to access your administrative workspace.' : 'Create your employee profile and set up workspace access.'}
               </p>
             </div>
 
             {/* Auth Glass Card wrapper */}
             <div className="glass p-6 sm:p-8 rounded-3xl border border-slate-900 bg-slate-950/40 shadow-2xl relative overflow-hidden backdrop-blur-xl">
+
+              {/* Employee/Admin login selector */}
+              <div className="mb-5 rounded-2xl border border-slate-900 bg-slate-950/60 p-2">
+                <p className="px-3 pt-1 pb-2 text-[10px] font-bold uppercase tracking-[0.2em] text-slate-500">Login as</p>
+                <div className="grid grid-cols-2 gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setSelectedRole('employee')}
+                    className={`rounded-xl border px-3 py-3 text-left transition-all ${
+                      selectedRole === 'employee'
+                        ? 'border-indigo-500/40 bg-indigo-950/30 text-white shadow-lg shadow-indigo-950/20'
+                        : 'border-slate-800 bg-slate-900/60 text-slate-400 hover:text-slate-200'
+                    }`}
+                  >
+                    <span className="block text-xs font-bold">Employee</span>
+                    <span className="block text-[10px] text-slate-500">Personal dashboard access</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setSelectedRole('admin')}
+                    className={`rounded-xl border px-3 py-3 text-left transition-all ${
+                      selectedRole === 'admin'
+                        ? 'border-violet-500/40 bg-violet-950/30 text-white shadow-lg shadow-violet-950/20'
+                        : 'border-slate-800 bg-slate-900/60 text-slate-400 hover:text-slate-200'
+                    }`}
+                  >
+                    <span className="block text-xs font-bold">Admin</span>
+                    <span className="block text-[10px] text-slate-500">Executive dashboard access</span>
+                  </button>
+                </div>
+              </div>
               
               {/* Form alerts (success/error) */}
               <AnimatePresence mode="wait">
@@ -296,20 +365,6 @@ export default function AuthPage() {
                 {formMode === 'signup' && (
                   <>
                     <div className="space-y-1.5">
-                      <label className="block font-bold text-slate-400">Company Name</label>
-                      <div className="flex items-center gap-2 bg-slate-900 border border-slate-800 p-3 rounded-xl">
-                        <Building className="h-4 w-4 text-slate-500" />
-                        <input
-                          type="text"
-                          placeholder="e.g. Initech Corp"
-                          value={companyName}
-                          onChange={(e) => setCompanyName(e.target.value)}
-                          className="bg-transparent border-none text-white placeholder-slate-600 focus:ring-0 focus:outline-none w-full"
-                        />
-                      </div>
-                    </div>
-                    
-                    <div className="space-y-1.5">
                       <label className="block font-bold text-slate-400">Full Name</label>
                       <div className="flex items-center gap-2 bg-slate-900 border border-slate-800 p-3 rounded-xl">
                         <User className="h-4 w-4 text-slate-500" />
@@ -322,16 +377,29 @@ export default function AuthPage() {
                         />
                       </div>
                     </div>
+                    
+                    <div className="space-y-1.5">
+                      <label className="block font-bold text-slate-400">Employee ID</label>
+                      <div className="flex items-center gap-2 bg-slate-900 border border-slate-800 p-3 rounded-xl">
+                        <Hash className="h-4 w-4 text-slate-500" />
+                        <input
+                          type="text"
+                          placeholder="EMP-1024"
+                          value={employeeId}
+                          onChange={(e) => setEmployeeId(e.target.value)}
+                          className="bg-transparent border-none text-white placeholder-slate-600 focus:ring-0 focus:outline-none w-full"
+                        />
+                      </div>
+                    </div>
 
                     <div className="space-y-1.5">
-                      <label className="block font-bold text-slate-400">Company Phone</label>
+                      <label className="block font-bold text-slate-400">Email Address</label>
                       <div className="flex items-center gap-2 bg-slate-900 border border-slate-800 p-3 rounded-xl">
-                        <Phone className="h-4 w-4 text-slate-500" />
                         <input
-                          type="tel"
-                          placeholder="+91 98765 43210"
-                          value={phone}
-                          onChange={(e) => setPhone(e.target.value)}
+                          type="email"
+                          placeholder="employee@hrms.com"
+                          value={signupEmail}
+                          onChange={(e) => setSignupEmail(e.target.value)}
                           className="bg-transparent border-none text-white placeholder-slate-600 focus:ring-0 focus:outline-none w-full"
                         />
                       </div>
@@ -339,20 +407,22 @@ export default function AuthPage() {
                   </>
                 )}
 
-                {/* --- STANDARD DUAL EMAIL FIELD --- */}
-                <div className="space-y-1.5">
-                  <label className="block font-bold text-slate-400">Email Address</label>
-                  <div className="flex items-center gap-2 bg-slate-900 border border-slate-800 p-3 rounded-xl focus-within:border-indigo-500/50 transition-colors">
-                    <Mail className="h-4 w-4 text-slate-500" />
-                    <input
-                      type="email"
-                      placeholder="admin@hrms.com"
-                      value={formMode === 'signin' ? loginEmail : signupEmail}
-                      onChange={(e) => formMode === 'signin' ? setLoginEmail(e.target.value) : setSignupEmail(e.target.value)}
-                      className="bg-transparent border-none text-white placeholder-slate-600 focus:ring-0 focus:outline-none w-full"
-                    />
+                {/* --- LOGIN IDENTIFIER FIELD --- */}
+                {formMode === 'signin' && (
+                  <div className="space-y-1.5">
+                    <label className="block font-bold text-slate-400">Employee ID or Email</label>
+                    <div className="flex items-center gap-2 bg-slate-900 border border-slate-800 p-3 rounded-xl focus-within:border-indigo-500/50 transition-colors">
+                      <Mail className="h-4 w-4 text-slate-500" />
+                      <input
+                        type="text"
+                        placeholder="EMP-1024 or employee@hrms.com"
+                        value={loginIdentifier}
+                        onChange={(e) => setLoginIdentifier(e.target.value)}
+                        className="bg-transparent border-none text-white placeholder-slate-600 focus:ring-0 focus:outline-none w-full"
+                      />
+                    </div>
                   </div>
-                </div>
+                )}
 
                 {/* --- PASSWORD FIELD & STRENGTH BAR --- */}
                 <div className="space-y-1.5">
@@ -448,7 +518,7 @@ export default function AuthPage() {
                     <div className="h-4 w-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
                   ) : (
                     <>
-                      <span>{formMode === 'signin' ? 'Verify and Enter Workspace' : 'Deploy Company Instance'}</span>
+                      <span>{formMode === 'signin' ? 'Sign In' : 'Create Employee Account'}</span>
                       <ArrowRight className="h-4 w-4" />
                     </>
                   )}
@@ -476,7 +546,7 @@ export default function AuthPage() {
             {/* Bottom Swapper Link */}
             <div className="text-center text-xs">
               <span className="text-slate-500">
-                {formMode === 'signin' ? "Don't have an account? " : "Already have an instance deployed? "}
+                {formMode === 'signin' ? "Need an employee account? " : "Already registered? "}
               </span>
               <button
                 onClick={() => {
@@ -486,7 +556,7 @@ export default function AuthPage() {
                 }}
                 className="font-bold text-indigo-400 hover:text-indigo-300 transition-colors"
               >
-                {formMode === 'signin' ? 'Deploy Instance' : 'Login Credentials'}
+                {formMode === 'signin' ? 'Sign Up' : 'Back to Sign In'}
               </button>
             </div>
           </div>

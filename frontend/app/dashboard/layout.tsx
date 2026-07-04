@@ -1,6 +1,7 @@
 'use client';
 
-import React from 'react';
+import React, { useEffect } from 'react';
+import { useRouter } from 'next/navigation';
 import { UIProvider, useUI } from '../../lib/context';
 import { Sidebar } from '../../components/common/sidebar';
 import { Navbar } from '../../components/common/navbar';
@@ -8,7 +9,18 @@ import { Copilot } from '../../components/common/copilot';
 
 // Inner wrapper that consumes the UIContext values
 const DashboardLayoutContent: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const { sidebarOpen } = useUI();
+  const router = useRouter();
+  const { sidebarOpen, isAuthenticated, authReady } = useUI();
+
+  useEffect(() => {
+    if (authReady && !isAuthenticated) {
+      router.replace('/');
+    }
+  }, [authReady, isAuthenticated, router]);
+
+  if (!authReady || !isAuthenticated) {
+    return null;
+  }
 
   return (
     <div className="relative min-h-screen bg-slate-950 text-slate-100 flex flex-col">
@@ -38,8 +50,6 @@ const DashboardLayoutContent: React.FC<{ children: React.ReactNode }> = ({ child
 
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
   return (
-    <UIProvider>
-      <DashboardLayoutContent>{children}</DashboardLayoutContent>
-    </UIProvider>
+    <DashboardLayoutContent>{children}</DashboardLayoutContent>
   );
 }

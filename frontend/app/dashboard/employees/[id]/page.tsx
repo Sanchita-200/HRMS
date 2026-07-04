@@ -48,64 +48,121 @@ export default function EmployeeProfileHub({ params }: { params: { id: string } 
     setDocumentsList((prev) => prev.filter((d) => d.id !== id));
   };
 
-  // --- 3. SALARY CONFIGURATION STATES (ADMIN ONLY) ---
-  const [wageType, setWageType] = useState<'monthly' | 'hourly' | 'annual'>('monthly');
-  const [annualCTC, setAnnualCTC] = useState(1200000);
+  // --- 3. SALARY CONFIGURATION STATES (ADMIN/HR ACCESSIBLE) ---
+  const [monthlyWage, setMonthlyWage] = useState(50000);
+  const [workingDays, setWorkingDays] = useState(5);
+  const [workingHours, setWorkingHours] = useState(8);
+  const [basicPct, setBasicPct] = useState(50);
+  const [hraPct, setHraPct] = useState(50);
   
-  // Salary component input states (Fixed amount or Percentage of CTC)
-  const [basicPct, setBasicPct] = useState(50); // 50% of CTC
-  const [hraPct, setHraPct] = useState(20);   // 20% of CTC
-  const [medicalFixed, setMedicalFixed] = useState(30000); // Fixed ₹30,000/yr
-  const [travelFixed, setTravelFixed] = useState(24000);  // Fixed ₹24,000/yr
-  const [specialFixed, setSpecialFixed] = useState(180000); // Fixed ₹1,80,000/yr
-  const [bonusFixed, setBonusFixed] = useState(100000);   // Fixed ₹1,00,000/yr
+  const [standardType, setStandardType] = useState<'pct' | 'fixed'>('fixed');
+  const [standardVal, setStandardVal] = useState(5000);
   
-  // Deductions
-  const [pfPct, setPfPct] = useState(12); // 12% of basic
-  const [incomeTaxPct, setIncomeTaxPct] = useState(15); // 15% of taxable
-  const [profTaxFixed, setProfTaxFixed] = useState(2400); // Fixed ₹2,400/yr
+  const [performanceType, setPerformanceType] = useState<'pct' | 'fixed'>('fixed');
+  const [performanceVal, setPerformanceVal] = useState(3000);
   
-  // Calculated output states
-  const [calcBasic, setCalcBasic] = useState(0);
-  const [calcHra, setCalcHra] = useState(0);
-  const [calcPF, setCalcPF] = useState(0);
-  const [calcTax, setCalcTax] = useState(0);
-  const [calcNet, setCalcNet] = useState(0);
-  const [isSalaryValid, setIsSalaryValid] = useState(true);
-  const [salaryError, setSalaryError] = useState('');
+  const [ltaType, setLtaType] = useState<'pct' | 'fixed'>('fixed');
+  const [ltaVal, setLtaVal] = useState(2000);
+  
+  const [pfEmployeePct, setPfEmployeePct] = useState(12);
+  const [pfEmployerPct, setPfEmployerPct] = useState(12);
+  const [profTax, setProfTax] = useState(200);
 
-  // Auto-calculate components upon adjustments
+  const [isLoadingSalary, setIsLoadingSalary] = useState(true);
+  const [isEditingSalary, setIsEditingSalary] = useState(false);
+  const [salarySaveLoading, setSalarySaveLoading] = useState(false);
+  const [salaryToast, setSalaryToast] = useState<{ type: 'success' | 'error', message: string } | null>(null);
+
+  // Load salary configuration from backend on mount/tab change
   useEffect(() => {
-    const basic = (annualCTC * basicPct) / 100;
-    const hra = (annualCTC * hraPct) / 100;
-    const pf = (basic * pfPct) / 100;
-    
-    // Sum earnings
-    const totalEarnings = basic + hra + medicalFixed + travelFixed + specialFixed + bonusFixed;
-    
-    // Sum deductions
-    const taxBase = totalEarnings - pf;
-    const tax = (taxBase * incomeTaxPct) / 100;
-    const totalDeductions = pf + tax + profTaxFixed;
-    
-    const net = totalEarnings - totalDeductions;
-    
-    setCalcBasic(basic);
-    setCalcHra(hra);
-    setCalcPF(pf);
-    setCalcTax(tax);
-    setCalcNet(net);
-
-    // Validate that the sum of earnings equals the annual CTC
-    if (totalEarnings !== annualCTC) {
-      setIsSalaryValid(false);
-      const diff = annualCTC - totalEarnings;
-      setSalaryError(`Validation Error: Sum of earnings components does not equal CTC. Difference: ${diff > 0 ? '+' : ''}₹${diff.toLocaleString()}`);
-    } else {
-      setIsSalaryValid(true);
-      setSalaryError('');
+    if (activeTab === 'salary') {
+      setIsLoadingSalary(true);
+      fetch(`http://localhost:8000/api/payroll/salary/${params.id}`)
+        .then(res => {
+          if (!res.ok) throw new Error("Failed to load salary configuration");
+          return res.json();
+        })
+        .then(data => {
+          setMonthlyWage(data.monthly_wage);
+          setWorkingDays(data.working_days_per_week);
+          setWorkingHours(data.working_hours_per_day);
+          setBasicPct(data.basic_pct);
+          setHraPct(data.hra_pct);
+          setStandardType(data.standard_allowance_type);
+          setStandardVal(data.standard_allowance_val);
+          setPerformanceType(data.performance_bonus_type);
+          setPerformanceVal(data.performance_bonus_val);
+          setLtaType(data.lta_type);
+          setLtaVal(data.lta_val);
+          setPfEmployeePct(data.pf_employee_pct);
+          setPfEmployerPct(data.pf_employer_pct);
+          setProfTax(data.professional_tax);
+          setIsLoadingSalary(false);
+        })
+        .catch(err => {
+          console.error(err);
+          setIsLoadingSalary(false);
+        });
     }
-  }, [annualCTC, basicPct, hraPct, medicalFixed, travelFixed, specialFixed, bonusFixed, pfPct, incomeTaxPct, profTaxFixed]);
+  }, [activeTab, params.id]);
+
+  // Live client-side calculations based on Indian Salary Math
+  const calcBasic = (monthlyWage * basicPct) / 100;
+  const calcHra = (calcBasic * hraPct) / 100;
+  const calcStandard = standardType === 'pct' ? (monthlyWage * standardVal) / 100 : standardVal;
+  const calcPerformance = performanceType === 'pct' ? (monthlyWage * performanceVal) / 100 : performanceVal;
+  const calcLta = ltaType === 'pct' ? (monthlyWage * ltaVal) / 100 : ltaVal;
+  
+  const totalComponents = calcBasic + calcHra + calcStandard + calcPerformance + calcLta;
+  const fixedAllowance = monthlyWage - totalComponents;
+  
+  const calcPF = (calcBasic * pfEmployeePct) / 100;
+  const calcNet = monthlyWage - calcPF - profTax;
+  
+  const isSalaryValid = totalComponents <= monthlyWage;
+  const salaryError = !isSalaryValid 
+    ? `Validation Error: Sum of components (₹${totalComponents.toLocaleString()}) exceeds Monthly Wage (₹${monthlyWage.toLocaleString()}). Difference: +₹${(totalComponents - monthlyWage).toLocaleString()}` 
+    : '';
+
+  const handleSaveSalary = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!isSalaryValid) return;
+    setSalarySaveLoading(true);
+    setSalaryToast(null);
+    try {
+      const res = await fetch(`http://localhost:8000/api/payroll/salary/${params.id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          monthly_wage: monthlyWage,
+          working_days_per_week: workingDays,
+          working_hours_per_day: workingHours,
+          basic_pct: basicPct,
+          hra_pct: hraPct,
+          standard_allowance_type: standardType,
+          standard_allowance_val: standardVal,
+          performance_bonus_type: performanceType,
+          performance_bonus_val: performanceVal,
+          lta_type: ltaType,
+          lta_val: ltaVal,
+          pf_employee_pct: pfEmployeePct,
+          pf_employer_pct: pfEmployerPct,
+          professional_tax: profTax
+        })
+      });
+      if (!res.ok) {
+        const errData = await res.json();
+        throw new Error(errData.detail || "Failed to save salary settings");
+      }
+      setSalaryToast({ type: 'success', message: 'Salary structure updated successfully in backend.' });
+      setIsEditingSalary(false);
+    } catch (err: any) {
+      setSalaryToast({ type: 'error', message: err.message });
+    } finally {
+      setSalarySaveLoading(false);
+      setTimeout(() => setSalaryToast(null), 5000);
+    }
+  };
 
   // --- 4. AI SALARY ASSISTANT CHAT ---
   const [salaryChatInput, setSalaryChatInput] = useState('');
@@ -122,9 +179,9 @@ export default function EmployeeProfileHub({ params }: { params: { id: string } 
       let reply = "Processing salary modeling... Let me analyze the current CTC splits.";
       const query = userMsg.text.toLowerCase();
       if (query.includes('explain') || query.includes('calculate')) {
-        reply = `Basic Pay: ₹${(calcBasic/12).toFixed(2)}/mo. HRA: ₹${(calcHra/12).toFixed(2)}/mo. Allowances sum up to ₹${((medicalFixed+travelFixed+specialFixed+bonusFixed)/12).toFixed(2)}/mo. Deductions include Tax (₹${(calcTax/12).toFixed(2)}/mo) and PF (₹${(calcPF/12).toFixed(2)}/mo), yielding a monthly Net Take-Home of ₹${(calcNet/12).toFixed(2)}.`;
+        reply = `Basic Pay: ₹${calcBasic.toFixed(2)}/mo. HRA: ₹${calcHra.toFixed(2)}/mo. Allowances sum up to ₹${(calcStandard + calcPerformance + calcLta + fixedAllowance).toFixed(2)}/mo. Deductions include Professional Tax (₹${profTax.toFixed(2)}/mo) and PF (₹${calcPF.toFixed(2)}/mo), yielding a monthly Net Take-Home of ₹${calcNet.toFixed(2)}.`;
       } else if (query.includes('suggest') || query.includes('optimize') || query.includes('better')) {
-        reply = "Optimization suggestion: To maximize employee tax exemption, HRA should be set to 40% of Basic Pay (currently 20%). Consider reducing the Special Allowance component accordingly to maintain the ₹12,00,000 CTC threshold.";
+        reply = "Optimization suggestion: To maximize employee tax exemption under Indian standard rules, set HRA to 50% of Basic Pay (currently set to HRA % basic). Consider reducing the Special/Fixed allowance component accordingly.";
       }
       const botMsg = { id: Math.random().toString(), sender: 'assistant', text: reply };
       setSalaryChatLog((prev) => [...prev, botMsg]);

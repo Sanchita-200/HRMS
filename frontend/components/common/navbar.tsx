@@ -1,14 +1,25 @@
 'use client';
 
 import React, { useState } from 'react';
+import { useRouter } from 'next/navigation';
 import { useUI } from '../../lib/context';
 import { Bell, Menu, User, Shield, Users, LogOut, Settings } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 
 export const Navbar: React.FC = () => {
-  const { role, setRole, sidebarOpen, setSidebarOpen, setCopilotOpen } = useUI();
+  const router = useRouter();
+  const { role, setRole, sidebarOpen, setSidebarOpen, setCopilotOpen, logout, user } = useUI();
   const [showNotifications, setShowNotifications] = useState(false);
   const [showProfile, setShowProfile] = useState(false);
+
+  const displayName = user?.name ?? 'Guest User';
+  const displayEmail = user?.email ?? 'not signed in';
+  const avatarText = displayName
+    .split(' ')
+    .filter(Boolean)
+    .slice(0, 2)
+    .map((part) => part.charAt(0).toUpperCase())
+    .join('');
 
   const notifications = [
     { id: '1', title: 'Leave Auto-Approved', text: 'Sarah Jenkins leave request auto-approved by AI.', time: '5m ago' },
@@ -28,7 +39,7 @@ export const Navbar: React.FC = () => {
         </button>
         <div className="hidden sm:block">
           <h2 className="text-sm font-medium text-slate-400">Enterprise HR Portal</h2>
-          <p className="text-xs text-slate-500">Welcome back, Administrator</p>
+          <p className="text-xs text-slate-500">Welcome back, {displayName}</p>
         </div>
       </div>
 
@@ -109,9 +120,9 @@ export const Navbar: React.FC = () => {
             className="flex items-center gap-3 bg-slate-900/40 hover:bg-slate-900/80 p-1.5 pr-3 rounded-xl border border-slate-900/80 transition-colors"
           >
             <div className="h-8 w-8 rounded-lg bg-gradient-to-tr from-indigo-500 to-purple-500 flex items-center justify-center font-bold text-white text-sm">
-              AD
+              {avatarText || 'GU'}
             </div>
-            <span className="text-xs font-semibold text-slate-300 hidden md:block">Alex Dev</span>
+            <span className="text-xs font-semibold text-slate-300 hidden md:block">{displayName}</span>
           </button>
 
           <AnimatePresence>
@@ -123,8 +134,8 @@ export const Navbar: React.FC = () => {
                 className="absolute right-0 mt-3 w-48 glass border border-slate-900 rounded-2xl p-2 shadow-xl z-50 bg-slate-950/95 text-xs text-slate-400 space-y-1"
               >
                 <div className="px-3 py-2 border-b border-slate-900 mb-1">
-                  <p className="font-bold text-white">Alex Dev</p>
-                  <p className="text-[10px]">alex.dev@hrms.com</p>
+                  <p className="font-bold text-white">{displayName}</p>
+                  <p className="text-[10px]">{displayEmail}</p>
                 </div>
                 <button className="w-full flex items-center gap-2.5 px-3 py-2 hover:bg-slate-900 hover:text-white rounded-lg transition-colors">
                   <User className="h-4 w-4" /> Profile Details
@@ -132,7 +143,14 @@ export const Navbar: React.FC = () => {
                 <button className="w-full flex items-center gap-2.5 px-3 py-2 hover:bg-slate-900 hover:text-white rounded-lg transition-colors">
                   <Settings className="h-4 w-4" /> Account Settings
                 </button>
-                <button className="w-full flex items-center gap-2.5 px-3 py-2 hover:bg-red-950/30 hover:text-red-400 rounded-lg transition-colors text-red-500">
+                <button
+                  onClick={() => {
+                    logout();
+                    setShowProfile(false);
+                    router.push('/');
+                  }}
+                  className="w-full flex items-center gap-2.5 px-3 py-2 hover:bg-red-950/30 hover:text-red-400 rounded-lg transition-colors text-red-500"
+                >
                   <LogOut className="h-4 w-4" /> Logout
                 </button>
               </motion.div>
